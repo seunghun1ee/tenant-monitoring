@@ -1,0 +1,15 @@
+---
+openstack_auth:
+    identity_endpoint: https://api.cloud:5000/v3/
+    username: *******
+    password: *******
+    # application_credential_id: ***************
+    # application_credential_secret: ********************
+    region: RegionOne
+    domain_name: Default
+    project_name: Project1
+    role: instance
+vault_grafana_admin_password: "Passw0rd!"
+prometheus_web_listen_address: "{{ ansible_fqdn | default(ansible_host) | default('localhost') }}:9090"
+slack_webhook: *********
+slack_channel: "#channel"

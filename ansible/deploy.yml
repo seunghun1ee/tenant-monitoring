@@ -1,0 +1,103 @@
+---
+
+- name: Deploy node_exporter
+  hosts: node_exporter:prometheus
+  tags: node_exporter
+  tasks:
+    - import_role:
+        name: cloudalchemy.node_exporter
+
+- name: Install alert manager
+  hosts: prometheus
+  tags: alertmanager
+  vars:
+    alertmanager_version: latest
+    alertmanager_slack_api_url: "{{ slack_webhook }}"
+    alertmanager_receivers:
+      - name: slack
+        slack_configs:
+          - channel: "{{ slack_channel }}"
+            title: '{% raw %}[{{ .Status | toUpper }}{{ if eq .Status "firing" }}:{{ .Alerts.Firing | len }}{{ end }}] {{ .CommonLabels.alertname }}{% endraw %}'
+            text: >-
+              {% raw %}{{ range .Alerts -}}
+              *Alert:* {{ .Annotations.summary }}{{ if .Labels.severity }} - `{{ .Labels.severity }}`{{ end }}
+              *Description:* {{ .Annotations.description }}
+              *Details:*
+                {{ range .Labels.SortedPairs }} • *{{ .Name }}:* `{{ .Value }}`
+                {{ end }}
+              {{ end }}{% endraw %}
+            send_resolved: true
+    alertmanager_route:
+      group_by: ['alertname', 'cluster', 'service']
+      group_wait: 30s
+      group_interval: 5m
+      repeat_interval: 3h
+      receiver: slack
+  tasks:
+    - import_role:
+        name: cloudalchemy.alertmanager
+
+- name: Setup core monitoring software
+  hosts: prometheus
+  tags: prometheus
+  vars:
+    prometheus_alertmanager_config:
+      # alertmanagers:
+      - static_configs:
+        - targets:
+          - "{{ ansible_fqdn | default(ansible_host) | default('localhost') }}:9093"
+    prometheus_scrape_configs:
+      - job_name: "prometheus"
+        metrics_path: "{{ prometheus_metrics_path }}"
+        static_configs:
+          - targets:
+              - "{{ ansible_fqdn | default(ansible_host) | default('localhost') }}:9090"
+      - job_name: 'openstack'
+        openstack_sd_configs:
+          - "{{ openstack_auth }}"
+        relabel_configs:
+          # Keep only active instances
+          - source_labels: [__meta_openstack_instance_status]
+            action: keep
+            regex: ACTIVE
+          # Keep only instances which are flagged for scraping
+          - source_labels: [__meta_openstack_tag_prometheus_scrape]
+            action: keep
+            regex: 'true'
+          # Update the scraping port if required
+          - source_labels: [__address__]
+            action: replace
+            regex: ([^:]+)(?::\d+)?
+            replacement: '${1}:9100'
+            target_label: __address__
+          # Replace the default instance by the OpenStack instance name
+          - source_labels: [__meta_openstack_instance_name]
+            target_label: instance
+  tasks:
+    - import_role:
+        name: cloudalchemy.prometheus
+
+- name: Deploy grafana
+  hosts: grafana
+  tags: grafana
+  tasks:
+    - assert:
+        that: vault_grafana_admin_password is defined
+        fail_msg: "Must define vault_grafana_admin_password"
+    - import_role:
+        name: cloudalchemy.grafana
+      vars:
+        grafana_security:
+          admin_password: "{{ vault_grafana_admin_password }}"
+          admin_user: "admin"
+        grafana_datasources:
+          - name: prometheus
+            type: prometheus
+            access: proxy
+            url: 'http://{{ prometheus_web_listen_address }}'
+            basicAuth: false
+        grafana_dashboards:
+          - dashboard_id: 1860
+            revision_id: 25
+            datasource: prometheus
+

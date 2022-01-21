@@ -1,0 +1,17 @@
+---
+all:
+  hosts:
+    deployer:
+  children:
+    node_exporter:
+      hosts:
+        monitoring:
+        vm-1:
+        vm-2:
+        vm-3:
+    prometheus:
+      hosts:
+        monitoring:
+    grafana:
+      hosts:
+        monitoring:
