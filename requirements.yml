@@ -1,7 +1,15 @@
 ---
 roles:
-  - src: cloudalchemy.node_exporter
-  - src: cloudalchemy.prometheus
-  - src: cloudalchemy.grafana
-  - src: cloudalchemy.alertmanager
+  - name: cloudalchemy.node_exporter
+    src: https://github.com/seunghun1ee/ansible-node-exporter.git
+    version: master
+  - name: cloudalchemy.prometheus
+    src: https://github.com/seunghun1ee/ansible-prometheus.git
+    version: fix-include
+  - name: cloudalchemy.grafana
+    src: https://github.com/seunghun1ee/ansible-grafana.git
+    version: fix-include
+  - name: cloudalchemy.alertmanager
+    src: https://github.com/seunghun1ee/ansible-alertmanager.git
+    version: fix-include
 ...
